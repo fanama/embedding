@@ -4,7 +4,7 @@ export class Vector {
   title: string;
   text: string;
   value: number[];
-  controller: repoEmbedding;
+  private controller: repoEmbedding;
 
   constructor(title: string, text: string, controller: repoEmbedding) {
     this.text = text;
@@ -12,6 +12,11 @@ export class Vector {
     this.controller = controller;
     this.value = [];
   }
+
+  exist(): boolean {
+    return this.value.length > 0;
+  }
+
   async setValue() {
     this.value = await this.controller.generate(this.text);
   }

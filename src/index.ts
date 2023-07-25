@@ -1,11 +1,13 @@
 import express from "express";
 import { Vector } from "./domain/entity/vector.js";
 import { Embedding } from "./infra/embedding/index.js";
+import { DocumentConttroller } from "./infra/document/index.js";
 
 const app = express();
 const port = 3000;
 
 const embedder = new Embedding();
+const documentController = new DocumentConttroller(embedder)
 
 app.get("/embed", async (req, res) => {
   const text = req.query.text;
@@ -15,6 +17,25 @@ app.get("/embed", async (req, res) => {
 
   try {
     const vector = new Vector("test", text as string, embedder);
+    await vector.setValue();
+
+    return res.send(vector);
+  } catch (error) {
+    res.status(500).json({ error });
+  }
+});
+
+app.get("/pdf", async (req, res) => {
+  const filename = req.query.filename;
+  if (!filename) {
+    return res.status(400).send("filename parameter is missing.");
+  }
+
+  const pathName = "./pdf/"+ filename
+
+  const vector = await documentController.get(filename as string,pathName)
+
+  try {
     await vector.setValue();
 
     return res.send(vector);

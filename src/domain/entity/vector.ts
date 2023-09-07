@@ -1,16 +1,26 @@
 import { repoEmbedding } from "../repo/repoEmbedding.js";
 
+function getNorm(vector :number[]):number{
+
+  const res = vector.reduce((acc,curr)=>acc+curr*curr,0)
+
+  return Math.sqrt(res)
+}
+
 export class Vector {
   title: string;
   text: string;
   value: number[];
-  private controller: repoEmbedding;
+  norm: number;
+  controller: repoEmbedding;
 
   constructor(title: string, text: string, controller: repoEmbedding) {
     this.text = text;
     this.title = title;
     this.controller = controller;
+
     this.value = [];
+    this.norm = 0;
   }
 
   exist(): boolean {
@@ -19,6 +29,7 @@ export class Vector {
 
   async setValue() {
     this.value = await this.controller.generate(this.text);
+    this.norm = getNorm(this.value)
   }
 
   compareOne(vector: Vector): number {

@@ -1,41 +1,60 @@
 import { Request, Response } from 'express';
-import { Server } from "socket.io";
 import { Chatbot } from '../../../domain/entity/chatbot.js';
-
+import Queue from 'bull';
 
 export class ChatbotHandler {
-  entity: Chatbot;
-
+  private readonly entity: Chatbot;
+  private readonly queue: Queue.Queue;
 
   constructor(entity: Chatbot) {
     this.entity = entity;
+    this.queue = new Queue('chat-queue');
+    this.initializeQueue();
   }
 
-  async chat (req: Request, res: Response) {
+  private initializeQueue (): void {
+    this.queue.on('active', () => console.log('Queue is active'));
+    this.queue.on('stalled', () => console.log('Queue is stalled'));
 
-    const question = req.body.question;
+    this.queue.process(1, async (job, done) => {
+      try {
+        const { question, socketID } = job.data;
+        const response = await this.processQuestion(question, socketID);
+        done(null, response);
+      } catch (error) {
+        done(null, error);
+      }
+    });
+  }
 
-    if (!question) {
-      return res.send("please ask me a question");
+  private async processQuestion (question: string, socketID: string | undefined): Promise<string> {
+    const handler = (token: string) => console.log({ socketID, question, token });
+    return this.entity.ask(question, handler);
+  }
+
+  async chat (req: Request, res: Response): Promise<void> {
+    try {
+      const { question, socketID } = req.body;
+
+      if (!question) {
+        res.status(400).send('Please ask me a question');
+        return;
+      }
+
+      if (!socketID) {
+        res.status(400).send('No socketID provided');
+        return;
+      }
+
+      const job = await this.queue.add({ question, socketID });
+
+      job.finished()
+        .then(response => res.send(response))
+        .catch(error => console.error(error));
+
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Internal Server Error');
     }
-
-    const io = (req as any).io as Server;
-
-    const socketID = req.body.socketID;
-
-    if (!socketID) {
-      return res.send("no socketID");
-    }
-
-
-    const handler = (token: string) => {
-      io.to(socketID).emit("message", token);
-    };
-
-
-    const response = await this.entity.ask(question as string, handler);
-
-
-    res.send(response);
   }
 }
